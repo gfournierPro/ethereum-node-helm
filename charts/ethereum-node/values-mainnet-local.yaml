@@ -16,8 +16,8 @@ executionLayer:
       memory: 2Gi
   storage:
     size: 10Gi
-    # Use standard storage class for local development
-    storageClass: "standard"
+    # Use local-path storage class for local development
+    storageClass: "local-path"
 
 consensusLayer:
   enabled: true
@@ -28,14 +28,14 @@ consensusLayer:
   resources:
     requests:
       cpu: 500m
-      memory: 1Gi
+      memory: 2Gi
     limits:
       cpu: 1000m
-      memory: 2Gi
+      memory: 4Gi
   storage:
     size: 10Gi
-    # Use standard storage class for local development
-    storageClass: "standard"
+    # Use local-path storage class for local development
+    storageClass: "local-path"
 
 # Disable storage class creation (use existing cluster storage class)
 storage:

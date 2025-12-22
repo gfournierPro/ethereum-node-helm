@@ -7,8 +7,9 @@ metadata:
   labels:
     {{- include "ethereum-node.labels" . | nindent 4 }}
 type: Opaque
-data:
-  # Generate random 64-character hex string
-  jwt.hex: {{ randAlphaNum 64 | b64enc }}
+stringData:
+  # JWT must be exactly 64 hex characters (32 bytes)
+  # Using sha256sum of random string to guarantee 64 hex chars
+  jwt.hex: {{ randAlphaNum 64 | sha256sum }}
 {{- end }}
 {{- end }}

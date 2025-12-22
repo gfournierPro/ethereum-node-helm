@@ -104,8 +104,6 @@ consensusLayer:
     - "--metrics"
     - "--metrics-address=0.0.0.0"
     - "--metrics-port=5054"
-    # Optimizations
-    - "--reconstruct-head"
   
   service:
     type: ClusterIP
@@ -120,6 +118,20 @@ validator:
   keystorePath: /validator-keys
   graffiti: "Powered by Kubernetes"
   feeRecipient: "0x0000000000000000000000000000000000000000"
+
+#############################
+# Storage Class
+#############################
+storageClass:
+  # Set to false to use an existing StorageClass in your cluster
+  create: false
+  name: fast-ssd
+  provisioner: pd.csi.storage.gke.io  # GKE example
+  parameters:
+    type: pd-ssd
+    replication-type: regional-pd
+  allowVolumeExpansion: true
+  volumeBindingMode: WaitForFirstConsumer
 
 #############################
 # Monitoring
