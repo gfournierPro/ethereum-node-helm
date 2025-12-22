@@ -1,0 +1,39 @@
+# Mainnet-specific configuration
+
+network: mainnet
+
+executionLayer:
+  storage:
+    size: 10Gi  # Mainnet requires ~900GB+
+  
+  extraArgs:
+    - "--syncmode=snap"
+    - "--maxpeers=50"
+    - "--cache=8192"  # More cache for mainnet
+    - "--http"
+    - "--http.api=eth,net,web3,txpool"
+    - "--http.addr=0.0.0.0"
+    - "--http.port=8545"
+    - "--http.vhosts=*"
+    - "--http.corsdomain=*"
+    - "--ws"
+    - "--ws.api=eth,net,web3"
+    - "--ws.addr=0.0.0.0"
+    - "--ws.port=8546"
+    - "--metrics"
+    - "--metrics.addr=0.0.0.0"
+    - "--metrics.port=6060"
+
+consensusLayer:
+  storage:
+    size: 10Gi  # Mainnet requires ~4TB+
+  
+  extraArgs:
+    - "--checkpoint-sync-url=https://mainnet-checkpoint-sync.attestant.io"
+    - "--http"
+    - "--http-address=0.0.0.0"
+    - "--http-port=5052"
+    - "--metrics"
+    - "--metrics-address=0.0.0.0"
+    - "--metrics-port=5054"
+    - "--reconstruct-historic-states"

@@ -1,0 +1,45 @@
+# Mainnet configuration with reduced resources for local/dev environments
+network: mainnet
+
+executionLayer:
+  enabled: true
+  replicas: 1
+  image:
+    repository: ethereum/client-go
+    tag: v1.16.7
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+  storage:
+    size: 10Gi
+    # Use standard storage class for local development
+    storageClass: "standard"
+
+consensusLayer:
+  enabled: true
+  replicas: 1
+  image:
+    repository: sigp/lighthouse
+    tag: v8.0.1
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+  storage:
+    size: 10Gi
+    # Use standard storage class for local development
+    storageClass: "standard"
+
+# Disable storage class creation (use existing cluster storage class)
+storage:
+  createStorageClass: false
+
+monitoring:
+  enabled: false

@@ -1,0 +1,41 @@
+{{- if .Values.executionLayer.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ethereum-node.fullname" . }}-execution
+  labels:
+    {{- include "ethereum-node.labels" . | nindent 4 }}
+    component: execution
+  {{- with .Values.executionLayer.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.executionLayer.service.type }}
+  clusterIP: None  # Headless service for StatefulSet
+  publishNotReadyAddresses: true
+  ports:
+  - name: p2p
+    port: 30303
+    targetPort: p2p
+    protocol: TCP
+  - name: p2p-udp
+    port: 30303
+    targetPort: p2p-udp
+    protocol: UDP
+  - name: rpc
+    port: 8545
+    targetPort: rpc
+  - name: ws
+    port: 8546
+    targetPort: ws
+  - name: authrpc
+    port: 8551
+    targetPort: authrpc
+  - name: metrics
+    port: 6060
+    targetPort: metrics
+  selector:
+    {{- include "ethereum-node.selectorLabels" . | nindent 4 }}
+    component: execution
+{{- end }}

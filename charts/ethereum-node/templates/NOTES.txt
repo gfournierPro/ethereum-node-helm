@@ -1,0 +1,44 @@
+🎉 Ethereum Node has been deployed!
+
+Network: {{ .Values.network }}
+Release: {{ .Release.Name }}
+Namespace: {{ .Release.Namespace }}
+
+📊 Check deployment status:
+
+  kubectl get pods -n {{ .Release.Namespace }} -l app.kubernetes.io/instance={{ .Release.Name }}
+  kubectl get pvc -n {{ .Release.Namespace }} -l app.kubernetes.io/instance={{ .Release.Name }}
+
+📝 View logs:
+
+  Execution Layer (Geth):
+    kubectl logs -f {{ include "ethereum-node.fullname" . }}-execution-0 -n {{ .Release.Namespace }}
+  
+  Consensus Layer (Lighthouse):
+    kubectl logs -f {{ include "ethereum-node.fullname" . }}-consensus-0 -n {{ .Release.Namespace }}
+
+🔍 Check sync status:
+
+  Execution Layer:
+    kubectl exec -it {{ include "ethereum-node.fullname" . }}-execution-0 -n {{ .Release.Namespace }} -- \
+      geth attach /data/geth.ipc --exec 'eth.syncing'
+  
+  Consensus Layer:
+    kubectl exec -it {{ include "ethereum-node.fullname" . }}-consensus-0 -n {{ .Release.Namespace }} -- \
+      wget -q -O - http://localhost:5052/eth/v1/node/syncing
+
+🌐 Access RPC endpoint (port-forward):
+
+  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "ethereum-node.fullname" . }}-execution 8545:8545
+  
+  # Then test:
+  curl -X POST http://localhost:8545 \
+    -H "Content-Type: application/json" \
+    -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+
+⚠️  IMPORTANT:
+- Initial sync can take 6-24 hours depending on network and hardware
+- Monitor disk usage: kubectl exec {{ include "ethereum-node.fullname" . }}-execution-0 -- df -h /data
+- Ensure storage class supports SSD for optimal performance
+
+📖 Documentation: https://github.com/gfournierPro/ethereum-node-helm

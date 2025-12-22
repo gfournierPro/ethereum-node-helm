@@ -1,0 +1,175 @@
+{{- if .Values.executionLayer.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "ethereum-node.fullname" . }}-execution
+  labels:
+    {{- include "ethereum-node.labels" . | nindent 4 }}
+    component: execution
+spec:
+  serviceName: {{ include "ethereum-node.fullname" . }}-execution
+  replicas: {{ .Values.executionLayer.replicas }}
+  selector:
+    matchLabels:
+      {{- include "ethereum-node.selectorLabels" . | nindent 6 }}
+      component: execution
+  
+  template:
+    metadata:
+      labels:
+        {{- include "ethereum-node.selectorLabels" . | nindent 8 }}
+        component: execution
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "6060"
+        prometheus.io/path: "/debug/metrics/prometheus"
+    
+    spec:
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      
+      initContainers:
+      # Generate JWT secret for EL-CL communication
+      - name: generate-jwt
+        image: busybox:1.36
+        command:
+        - sh
+        - -c
+        - |
+          set -e
+          JWT_SECRET_FILE="/jwt/jwt.hex"
+          if [ ! -f "$JWT_SECRET_FILE" ]; then
+            echo "Generating JWT secret..."
+            tr -dc 'A-F0-9' < /dev/urandom | head -c 64 > "$JWT_SECRET_FILE"
+            chmod 600 "$JWT_SECRET_FILE"
+            echo "JWT secret generated"
+          else
+            echo "JWT secret already exists"
+          fi
+        volumeMounts:
+        - name: jwt-secret
+          mountPath: /jwt
+        securityContext:
+          runAsUser: 1000
+          runAsGroup: 1000
+      
+      containers:
+      - name: geth
+        image: "{{ .Values.executionLayer.image.repository }}:{{ .Values.executionLayer.image.tag }}"
+        imagePullPolicy: {{ .Values.executionLayer.image.pullPolicy }}
+        
+        {{- with .Values.containerSecurityContext }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        
+        command:
+        - geth
+        
+        args:
+        - --{{ .Values.network }}
+        - --datadir=/data
+        # Engine API (Consensus Layer Communication)
+        - --authrpc.addr=0.0.0.0
+        - --authrpc.port=8551
+        - --authrpc.vhosts={{ include "ethereum-node.fullname" . }}-execution,localhost
+        - --authrpc.jwtsecret=/jwt/jwt.hex
+        {{- range .Values.executionLayer.extraArgs }}
+        - {{ . }}
+        {{- end }}
+        
+        ports:
+        - name: p2p
+          containerPort: 30303
+          protocol: TCP
+        - name: p2p-udp
+          containerPort: 30303
+          protocol: UDP
+        - name: rpc
+          containerPort: 8545
+        - name: ws
+          containerPort: 8546
+        - name: authrpc
+          containerPort: 8551
+        - name: metrics
+          containerPort: 6060
+        
+        resources:
+          {{- toYaml .Values.executionLayer.resources | nindent 10 }}
+        
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: jwt-secret
+          mountPath: /jwt
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+        
+        # Liveness: Is the process running?
+        livenessProbe:
+          httpGet:
+            path: /
+            port: rpc
+            httpHeaders:
+            - name: Content-Type
+              value: application/json
+          initialDelaySeconds: 60
+          periodSeconds: 60
+          timeoutSeconds: 10
+          failureThreshold: 3
+        
+        # Readiness: Is the node synced and accepting requests?
+        readinessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - |
+              # Check if node is synced (eth_syncing returns false)
+              result=$(wget -q -O - --post-data='{"jsonrpc":"2.0","method":"eth_syncing","params":[],"id":1}' \
+                --header='Content-Type: application/json' \
+                http://localhost:8545 2>/dev/null | grep -o '"result":false' || echo "")
+              [ -n "$result" ] || exit 1
+          initialDelaySeconds: 120
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 5
+      
+      volumes:
+      - name: jwt-secret
+        emptyDir:
+          medium: Memory
+          sizeLimit: 1Mi
+      - name: tmp
+        emptyDir: {}
+      
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+      labels:
+        {{- include "ethereum-node.labels" . | nindent 8 }}
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: {{ .Values.executionLayer.storage.storageClass }}
+      resources:
+        requests:
+          storage: {{ .Values.executionLayer.storage.size }}
+{{- end }}

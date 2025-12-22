@@ -1,0 +1,28 @@
+apiVersion: v2
+name: ethereum-node
+description: >
+  Production-grade Ethereum full node with execution layer (Geth) 
+  and consensus layer (Lighthouse). Supports mainnet, Goerli, and Sepolia.
+type: application
+version: 1.0.0
+appVersion: "1.0"
+
+keywords:
+  - ethereum
+  - blockchain
+  - geth
+  - lighthouse
+  - web3
+  - cryptocurrency
+
+home: https://github.com/gfournierPro/ethereum-node-helm
+
+sources:
+  - https://github.com/ethereum/go-ethereum
+  - https://github.com/sigp/lighthouse
+
+maintainers:
+  - name: Your Name
+    email: you@example.com
+
+dependencies: []  # No Helm dependencies for this example

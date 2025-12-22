@@ -1,0 +1,35 @@
+{{- if .Values.consensusLayer.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ethereum-node.fullname" . }}-consensus
+  labels:
+    {{- include "ethereum-node.labels" . | nindent 4 }}
+    component: consensus
+  {{- with .Values.consensusLayer.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.consensusLayer.service.type }}
+  clusterIP: None  # Headless service for StatefulSet
+  publishNotReadyAddresses: true
+  ports:
+  - name: p2p-tcp
+    port: 9000
+    targetPort: p2p-tcp
+    protocol: TCP
+  - name: p2p-udp
+    port: 9000
+    targetPort: p2p-udp
+    protocol: UDP
+  - name: http
+    port: 5052
+    targetPort: http
+  - name: metrics
+    port: 5054
+    targetPort: metrics
+  selector:
+    {{- include "ethereum-node.selectorLabels" . | nindent 4 }}
+    component: consensus
+{{- end }}

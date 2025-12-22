@@ -1,0 +1,200 @@
+# Default values for ethereum-node
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+#############################
+# Network Configuration
+#############################
+network: mainnet  # Options: mainnet, goerli, sepolia
+
+#############################
+# Execution Layer (Geth)
+#############################
+executionLayer:
+  enabled: true
+  
+  image:
+    repository: ethereum/client-go
+    tag: "v1.16.7"  # Check latest: https://github.com/ethereum/go-ethereum/releases
+    pullPolicy: IfNotPresent
+  
+  replicas: 1
+  
+  resources:
+    requests:
+      memory: "8Gi"
+      cpu: "2000m"
+    limits:
+      memory: "16Gi"
+      cpu: "4000m"
+  
+  # Storage configuration
+  storage:
+    size: 10Gi
+    storageClass: "fast-ssd"
+    # Alternative storage classes:
+    # - "gp3" (AWS)
+    # - "premium-rwo" (GCP)
+    # - "managed-premium" (Azure)
+  
+  # Geth command-line arguments
+  extraArgs:
+  # Sync mode: snap is faster than full, archive for everything
+    - "--syncmode=snap"
+  # Networking
+    - "--maxpeers=50"
+  # Caching for performance
+    - "--cache=4096"
+  # RPC/JSON-RPC API
+    - "--http"
+    - "--http.api=eth,net,web3,txpool"
+    - "--http.addr=0.0.0.0"
+    - "--http.port=8545"
+    - "--http.vhosts=*"
+    - "--http.corsdomain=*"
+  # WebSocket API
+    - "--ws"
+    - "--ws.api=eth,net,web3"
+    - "--ws.addr=0.0.0.0"
+    - "--ws.port=8546"
+  # Metrics (Prometheus)
+    - "--metrics"
+    - "--metrics.addr=0.0.0.0"
+    - "--metrics.port=6060"
+  
+  service:
+    type: ClusterIP # NodePort or LoadBalancer if external access needed
+    annotations: {}
+    
+    # P2P discovery port (must be exposed for peering)
+    p2pPort: 30303
+
+#############################
+# Consensus Layer (Lighthouse)
+#############################
+consensusLayer:
+  enabled: true
+  
+  image:
+    repository: sigp/lighthouse
+    tag: "v8.0.1" # Check: https://github.com/sigp/lighthouse/releases
+    pullPolicy: IfNotPresent
+  
+  replicas: 1
+  
+  resources:
+    requests:
+      memory: "4Gi"
+      cpu: "1000m"
+    limits:
+      memory: "8Gi"
+      cpu: "2000m"
+  
+  storage:
+    size: 200Gi # Beacon chain state
+    storageClass: "fast-ssd"
+  
+  # Lighthouse beacon node arguments
+  extraArgs:
+  # Checkpoint sync (fast startup)
+    - "--checkpoint-sync-url=https://mainnet-checkpoint-sync.attestant.io"
+    - "--http"
+    - "--http-address=0.0.0.0"
+    - "--http-port=5052"
+    - "--metrics"
+    - "--metrics-address=0.0.0.0"
+    - "--metrics-port=5054"
+    # Optimizations
+    - "--reconstruct-head"
+  
+  service:
+    type: ClusterIP
+    annotations: {}
+    p2pPort: 9000
+
+#############################
+# Validator (Optional)
+#############################
+validator:
+  enabled: false
+  keystorePath: /validator-keys
+  graffiti: "Powered by Kubernetes"
+  feeRecipient: "0x0000000000000000000000000000000000000000"
+
+#############################
+# Monitoring
+#############################
+monitoring:
+  enabled: true
+
+  # Prometheus ServiceMonitor
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    scrapeTimeout: 10s
+    labels:
+      prometheus: kube-prometheus
+
+#############################
+# Security Context
+#############################
+podSecurityContext:
+  fsGroup: 1000
+  runAsNonRoot: true
+  runAsUser: 1000
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: true
+
+#############################
+# Node Selection & Affinity
+#############################
+nodeSelector: {}
+  # Example: Run only on dedicated blockchain nodes
+  # node-type: blockchain
+
+affinity: {}
+  # Example: Pod anti-affinity for HA
+  # podAntiAffinity:
+  #   preferredDuringSchedulingIgnoredDuringExecution:
+  #   - weight: 100
+  #     podAffinityTerm:
+  #       labelSelector:
+  #         matchLabels:
+  #           app.kubernetes.io/name: ethereum-node
+  #       topologyKey: kubernetes.io/hostname
+
+tolerations: []
+  # Example: Tolerate dedicated node taints
+  # - key: "dedicated"
+  #   operator: "Equal"
+  #   value: "blockchain"
+  #   effect: "NoSchedule"
+
+#############################
+# Network Policy
+#############################
+networkPolicy:
+  enabled: false  # Enable for production network isolation
+
+#############################
+# Ingress (for RPC access)
+#############################
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: rpc.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+    # - secretName: rpc-tls
+    #   hosts:
+    #     - rpc.example.com

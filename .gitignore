@@ -1,0 +1,23 @@
+# Helm
+*.tgz
+.helmignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test artifacts
+test-results/
+coverage/
+
+# Secrets (NEVER commit these!)
+*secret*
+*key*
+*.pem
+values-local.yaml

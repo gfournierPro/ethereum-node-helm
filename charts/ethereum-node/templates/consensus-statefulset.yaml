@@ -1,0 +1,185 @@
+{{- if .Values.consensusLayer.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "ethereum-node.fullname" . }}-consensus
+  labels:
+    {{- include "ethereum-node.labels" . | nindent 4 }}
+    component: consensus
+spec:
+  serviceName: {{ include "ethereum-node.fullname" . }}-consensus
+  replicas: {{ .Values.consensusLayer.replicas }}
+  selector:
+    matchLabels:
+      {{- include "ethereum-node.selectorLabels" . | nindent 6 }}
+      component: consensus
+  
+  template:
+    metadata:
+      labels:
+        {{- include "ethereum-node.selectorLabels" . | nindent 8 }}
+        component: consensus
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "5054"
+        prometheus.io/path: "/metrics"
+    
+    spec:
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      
+      initContainers:
+      # Wait for execution layer to be ready
+      - name: wait-for-execution
+        image: busybox:1.36
+        command:
+        - sh
+        - -c
+        - |
+          echo "Waiting for execution layer at {{ include "ethereum-node.fullname" . }}-execution-0.{{ include "ethereum-node.fullname" . }}-execution:8551..."
+          until nc -z {{ include "ethereum-node.fullname" . }}-execution-0.{{ include "ethereum-node.fullname" . }}-execution 8551; do
+            echo "Execution layer not ready, retrying in 5 seconds..."
+            sleep 5
+          done
+          echo "Execution layer is ready!"
+      
+      # Copy JWT secret from execution layer
+      - name: copy-jwt
+        image: busybox:1.36
+        command:
+        - sh
+        - -c
+        - |
+          echo "Copying JWT secret..."
+          if [ -f /jwt-source/jwt.hex ]; then
+            cp /jwt-source/jwt.hex /jwt/jwt.hex
+            chmod 600 /jwt/jwt.hex
+            echo "JWT secret copied"
+          else
+            echo "ERROR: JWT secret not found!"
+            exit 1
+          fi
+        volumeMounts:
+        - name: jwt-secret-source
+          mountPath: /jwt-source
+          readOnly: true
+        - name: jwt-secret
+          mountPath: /jwt
+        securityContext:
+          runAsUser: 1000
+          runAsGroup: 1000
+      
+      containers:
+      - name: lighthouse
+        image: "{{ .Values.consensusLayer.image.repository }}:{{ .Values.consensusLayer.image.tag }}"
+        imagePullPolicy: {{ .Values.consensusLayer.image.pullPolicy }}
+        
+        {{- with .Values.containerSecurityContext }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        
+        command:
+        - lighthouse
+        
+        args:
+        - beacon_node
+        - --network={{ .Values.network }}
+        - --datadir=/data
+        - --execution-endpoint=http://{{ include "ethereum-node.fullname" . }}-execution-0.{{ include "ethereum-node.fullname" . }}-execution:8551
+        - --execution-jwt=/jwt/jwt.hex
+        {{- range .Values.consensusLayer.extraArgs }}
+        - {{ . }}
+        {{- end }}
+        
+        ports:
+        - name: p2p-tcp
+          containerPort: 9000
+          protocol: TCP
+        - name: p2p-udp
+          containerPort: 9000
+          protocol: UDP
+        - name: http
+          containerPort: 5052
+        - name: metrics
+          containerPort: 5054
+        
+        resources:
+          {{- toYaml .Values.consensusLayer.resources | nindent 10 }}
+        
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: jwt-secret
+          mountPath: /jwt
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+        
+        livenessProbe:
+          httpGet:
+            path: /eth/v1/node/health
+            port: http
+          initialDelaySeconds: 120
+          periodSeconds: 60
+          timeoutSeconds: 10
+          failureThreshold: 3
+        
+        readinessProbe:
+          # exec:
+          #   command:
+          #   - sh
+          #   - -c
+          #   - |
+          #     # Check if consensus layer is synced
+          #     sync_status=$(wget -q -O - http://localhost:5052/eth/v1/node/syncing 2>/dev/null)
+          #     echo "$sync_status" | grep -q '"is_syncing":false' || exit 1
+          httpGet:
+            path: /eth/v1/node/syncing
+            port: http
+          initialDelaySeconds: 120
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 5
+      
+      volumes:
+      - name: jwt-secret-source
+        secret:
+          secretName: {{ include "ethereum-node.fullname" . }}-jwt
+          defaultMode: 0400
+      - name: jwt-secret
+        emptyDir:
+          medium: Memory
+          sizeLimit: 1Mi
+      - name: tmp
+        emptyDir: {}
+      
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+      labels:
+        {{- include "ethereum-node.labels" . | nindent 8 }}
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: {{ .Values.consensusLayer.storage.storageClass }}
+      resources:
+        requests:
+          storage: {{ .Values.consensusLayer.storage.size }}
+{{- end }}

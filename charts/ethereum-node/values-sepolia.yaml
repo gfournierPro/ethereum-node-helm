@@ -1,0 +1,54 @@
+# Sepolia testnet configuration
+
+network: sepolia
+
+executionLayer:
+  storage:
+    size: 10Gi
+  
+  resources:
+    requests:
+      memory: "4Gi"
+      cpu: "1000m"
+    limits:
+      memory: "8Gi"
+      cpu: "2000m"
+  
+  extraArgs:
+    - "--syncmode=snap"
+    - "--maxpeers=30"
+    - "--cache=2048"
+    - "--http"
+    - "--http.api=eth,net,web3,txpool,debug"
+    - "--http.addr=0.0.0.0"
+    - "--http.port=8545"
+    - "--http.vhosts=*"
+    - "--http.corsdomain=*"
+    - "--ws"
+    - "--ws.api=eth,net,web3,debug"
+    - "--ws.addr=0.0.0.0"
+    - "--ws.port=8546"
+    - "--metrics"
+    - "--metrics.addr=0.0.0.0"
+    - "--metrics.port=6060"
+
+consensusLayer:
+  storage:
+    size: 50Gi
+  
+  resources:
+    requests:
+      memory: "2Gi"
+      cpu: "500m"
+    limits:
+      memory: "4Gi"
+      cpu: "1000m"
+  
+  extraArgs:
+    - "--checkpoint-sync-url=https://sepolia.beaconstate.info"
+    - "--http"
+    - "--http-address=0.0.0.0"
+    - "--http-port=5052"
+    - "--metrics"
+    - "--metrics-address=0.0.0.0"
+    - "--metrics-port=5054"
