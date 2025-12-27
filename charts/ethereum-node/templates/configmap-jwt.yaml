@@ -6,10 +6,17 @@ metadata:
   name: {{ include "ethereum-node.fullname" . }}-jwt
   labels:
     {{- include "ethereum-node.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/resource-policy": keep  # ← Prevent deletion on uninstall
 type: Opaque
 stringData:
-  # JWT must be exactly 64 hex characters (32 bytes)
-  # Using sha256sum of random string to guarantee 64 hex chars
-  jwt.hex: {{ randAlphaNum 64 | sha256sum }}
+  {{- if .Values.jwt.token }}
+  # Use provided JWT token
+  jwt.hex: {{ .Values.jwt.token | quote }}
+  {{- else }}
+  # Generate JWT token only if not exists
+  # This will be kept across upgrades due to lookup
+  jwt.hex: {{ (lookup "v1" "Secret" .Release.Namespace (printf "%s-jwt" (include "ethereum-node.fullname" .))) | ternary ((lookup "v1" "Secret" .Release.Namespace (printf "%s-jwt" (include "ethereum-node.fullname" .))).data.jwt.hex | b64dec) (randAlphaNum 64 | sha256sum) | quote }}
+  {{- end }}
 {{- end }}
 {{- end }}
