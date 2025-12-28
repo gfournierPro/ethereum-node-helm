@@ -7,6 +7,16 @@
 #############################
 network: mainnet  # Options: mainnet, goerli, sepolia
 
+jwt:
+  # Option 1: Use an existing Kubernetes secret (recommended with sealed-secrets)
+  # Set this to the name of your secret if using sealed-secrets or external secret management
+  existingSecret: ""  # e.g., "ethereum-node-jwt"
+  
+  # Option 2: Provide a pre-generated JWT token (64 hex characters)
+  # Generate with: openssl rand -hex 32
+  # Only used if existingSecret is not set
+  token: ""  # Leave empty to auto-generate (not recommended for production)
+
 #############################
 # Execution Layer (Geth)
 #############################
